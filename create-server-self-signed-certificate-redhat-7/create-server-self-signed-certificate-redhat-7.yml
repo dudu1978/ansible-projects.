@@ -42,16 +42,10 @@
 - name: Generate an OpenSSL Certificate
   shell: openssl x509 -req -days {{ certificate_validation_period }} -in {{ certificate_request_path }}{{ certificate_request_file_name }} -signkey {{ private_key_path }}{{ private_key_file_name }}  -out {{ certificate_path }}{{ certificate_file_name }}
 
-## The below 2 steps are required to be run on each client that tries to connect to the server
+## The below 2 steps are required to be run on each client that should connect the server
 
-- name: Read {{ server_hostname }} certificate
-  shell: cat {{ certificate_path }}{{ certificate_file_name }}
-  register: certificate
+- name: Copy certificate to /etc/pki/ca-trust/source/anchors
+  shell: cp {{ certificate_path }}{{ certificate_file_name }} /etc/pki/ca-trust/source/anchors/
 
-- name: update {{ server_hostname }} certificate in ca_bundle_file
-  blockinfile:
-    path: "{{ ca_bundle_file }}"
-    block: |
-
-        ## {{ server_hostname }} cetificated ##
-        {{ certificate.stdout }}
+- name: Add {{ server_hostname }} certificate to server
+  shell: update-ca-trust extract

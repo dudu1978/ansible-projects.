@@ -1,0 +1,57 @@
+ - name: set fact for SSL Certifaicte
+   set_fact:
+       server_hostname: servermame.domain  ## It is veriy important to define teh server base don the domain if exsists 
+       private_key_path: /etc/pki/tls/private/
+       private_key_file_name: private.key
+       certificate_request_path: /etc/pki/tls/certs/
+       certificate_request_file_name: certificate_request.csr
+       certificate_path: /etc/pki/tls/certs/
+       ca_bundle_file: /etc/pki/tls/certs/ca-bundle.crt
+       certificate_file_name: "{{ server_hostname }}.crt"
+       key_size: 4096
+       passphrase:
+       key_type: RSA
+       country_name: xx
+       state: xx
+       province: xx
+       email_address:
+       organization_name: "{{ server_hostname }}" ## This value must me the server hostname 
+       certificate_validation_period: 1000
+ 
+ - name: Generate an OpenSSL private key
+  openssl_privatekey:
+      path: "{{ private_key_path }}{{ private_key_file_name }}"
+      size: "{{ key_size }}"
+      type: "{{ key_type }}"
+      backup: yes
+
+- name: Generate an OpenSSL Certificate Signing Request
+  shell: openssl req -new -key {{ private_key_path }}{{ private_key_file_name }} -out {{ certificate_request_path }}{{ certificate_request_file_name }} -subj "/C={{ country_name }}/ST= {{ state }}/L={{ province }}/O={{ organization_name }}/CN={{ server_hostname }}"
+
+#- name: Generate an OpenSSL Certificate Signing Request with Subject information - This can run with python 3 only
+#  vars:
+#    ansible_python_interpreter: /usr/bin/python3
+#  openssl_csr:
+#      path: "/etc/pki/tls/test/certificate_request.csr"
+#      privatekey_path: "/etc/pki/tls/test/private.key"
+#      country_name: "{{ country_name }}"
+#      organization_name: "{{ organization_name }}"
+#      email_address: "{{ email_address }}"
+#      common_name: "{{ server_hostname }}"
+
+- name: Generate an OpenSSL Certificate
+  shell: openssl x509 -req -days {{ certificate_validation_period }} -in {{ certificate_request_path }}{{ certificate_request_file_name }} -signkey {{ private_key_path }}{{ private_key_file_name }}  -out {{ certificate_path }}{{ certificate_file_name }}
+
+## The below 2 steps are required to be run on each client that tries to connect to the server
+
+- name: Read {{ server_hostname }} certificate
+  shell: cat {{ certificate_path }}{{ certificate_file_name }}
+  register: certificate
+
+- name: update {{ server_hostname }} certificate in ca_bundle_file
+  blockinfile:
+    path: "{{ ca_bundle_file }}"
+    block: |
+
+        ## {{ server_hostname }} cetificated ##
+        {{ certificate.stdout }}
